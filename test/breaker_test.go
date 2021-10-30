@@ -3,6 +3,9 @@ package test
 import (
 	"cloud-design-patterns/pkg/stability"
 	"errors"
+	"fmt"
+	"github.com/lissdx/yapgo/pkg/pipeline"
+	"sync"
 	"testing"
 	"time"
 )
@@ -11,7 +14,6 @@ var (
 	intentionalErr = errors.New("INTENTIONAL FAIL!")
 	breakerErr = stability.ErrOpenState
 )
-//ticker := time.NewTicker(250 * time.Millisecond).C
 
 // failAfter returns a function matching the Circuit type that returns an
 // error after its been called more than threshold times.
@@ -35,14 +37,16 @@ func failAfter(threshold int) stability.ProcessFn {
 func flipFailAfter(flipThreshold int) stability.ProcessFn {
 	count := 0
 	isError := true
-
+	var mu sync.Mutex
 	// Service function. Fails after 5 tries.
 	return func(inObj interface{}) (interface{}, error) {
 
+		mu.Lock()
 		if count % flipThreshold == 0 {
 			isError = !isError
 		}
 		count++
+		mu.Unlock()
 
 		if isError{
 			return nil, intentionalErr
@@ -126,221 +130,75 @@ func TestBreakerOpenClose(t *testing.T) {
 	}
 }
 
-//func TestThrottleMax10(t *testing.T) {
-//
-//	calsCnt := func() func(interface{}) (interface{}, error) {
-//		cnt := 0
-//		return func(_ interface{}) (interface{}, error) {
-//			cnt++
-//			return cnt, nil
-//		}
-//	}()
-//
-//	throttleSettings := stability.ThrottleSettings{
-//		Name: "TestThrottleMax1", MaxTokens: 10, RefillTokensCnt: 10, RefillInterval: time.Duration(1) * time.Second,
-//	}
-//
-//	throttle := stability.NewThrottle(throttleSettings)
-//	throttleEffector := throttle.GetProcessorFn(calsCnt)
-//
-//	var resGot int
-//	var errCnt int
-//
-//	for i := 0; i < 100; i++ {
-//		res, err := throttleEffector(i)
-//		if err == nil {
-//			resGot = res.(int)
-//		} else {
-//			errCnt++
-//		}
-//
-//	}
-//
-//	if errCnt != 90 {
-//		t.Errorf("errCnt = %v, want %v", errCnt, 90)
-//	}
-//
-//	if resGot != 10 {
-//		t.Errorf("resGot = %v, want %v", resGot, 10)
-//	}
-//}
-//
-//func TestThrottleMax10Refill3Times(t *testing.T) {
-//
-//	calsCnt := func() func(interface{}) (interface{}, error) {
-//		cnt := 0
-//		return func(_ interface{}) (interface{}, error) {
-//			cnt++
-//			return cnt, nil
-//		}
-//	}()
-//
-//	throttleSettings := stability.ThrottleSettings{
-//		Name: "TestThrottleMax1", MaxTokens: 10, RefillTokensCnt: 10, RefillInterval: time.Duration(300) * time.Millisecond,
-//	}
-//
-//	throttle := stability.NewThrottle(throttleSettings)
-//	throttleEffector := throttle.GetProcessorFn(calsCnt)
-//
-//	var resGot int
-//	var errCnt int
-//
-//	for a := 0; a < 3; a++ {
-//		for i := 0; i < 100; i++ {
-//			res, err := throttleEffector(i)
-//			if err == nil {
-//				resGot = res.(int)
-//			} else {
-//				errCnt++
-//			}
-//		}
-//		//fmt.Printf("resGot: %d, errCnt: %d\n", resGot, errCnt)
-//		time.Sleep(time.Duration(1) * time.Second)
-//	}
-//
-//	if errCnt != 270 {
-//		t.Errorf("errCnt = %v, want %v", errCnt, 270)
-//	}
-//
-//	if resGot != 30 {
-//		t.Errorf("resGot = %v, want %v", resGot, 30)
-//	}
-//}
-//
-//func TestThrottleQuickRefill(t *testing.T) {
-//
-//	calsCnt := func() func(interface{}) (interface{}, error) {
-//		cnt := 0
-//		return func(_ interface{}) (interface{}, error) {
-//			cnt++
-//			return cnt, nil
-//		}
-//	}()
-//
-//	throttleSettings := stability.ThrottleSettings{
-//		Name: "TestThrottleMax1", MaxTokens: 10, RefillTokensCnt: 10, RefillInterval: time.Duration(10) * time.Millisecond,
-//	}
-//
-//	throttle := stability.NewThrottle(throttleSettings)
-//	throttleEffector := throttle.GetProcessorFn(calsCnt)
-//
-//	var resGot int
-//	var errCnt int
-//
-//	for i := 0; i < 100; i++ {
-//		res, err := throttleEffector(i)
-//		if err == nil {
-//			resGot = res.(int)
-//		} else {
-//			errCnt++
-//		}
-//		time.Sleep(time.Duration(1) * time.Millisecond)
-//	}
-//	fmt.Printf("resGot: %d, errCnt: %d\n", resGot, errCnt)
-//
-//
-//	if errCnt != 0 {
-//		t.Errorf("errCnt = %v, want %v", errCnt, 0)
-//	}
-//
-//	if resGot != 100 {
-//		t.Errorf("resGot = %v, want %v", resGot, 100)
-//	}
-//}
-//
-//func TestThrottleFrequency5Seconds(t *testing.T) {
-//
-//	calsCnt := func() func(interface{}) (interface{}, error) {
-//		cnt := 0
-//		return func(_ interface{}) (interface{}, error) {
-//			cnt++
-//			return cnt, nil
-//		}
-//	}()
-//
-//	throttleSettings := stability.ThrottleSettings{
-//		Name: "TestThrottleMax1", MaxTokens: 1, RefillTokensCnt: 1, RefillInterval: time.Duration(1) * time.Second,
-//	}
-//
-//	throttle := stability.NewThrottle(throttleSettings)
-//	throttleEffector := throttle.GetProcessorFn(calsCnt)
-//
-//	var resGot int
-//	var errCnt int
-//	ticker := time.NewTicker(250 * time.Millisecond).C
-//	tickCounts := 0
-//
-//	for range ticker {
-//		tickCounts++
-//		res, err := throttleEffector(0)
-//		if err == nil {
-//			resGot = res.(int)
-//		} else {
-//			errCnt++
-//		}
-//
-//		if tickCounts >= 20 {
-//			break
-//		}
-//	}
-//
-//	fmt.Printf("resGot: %d, errCnt: %d\n", resGot, errCnt)
-//
-//	if errCnt != 15 {
-//		t.Errorf("errCnt = %v, want %v", errCnt, 15)
-//	}
-//
-//	if resGot != 5 {
-//		t.Errorf("resGot = %v, want %v", resGot, 5)
-//	}
-//}
-//
-//func TestThrottleRefill(t *testing.T) {
-//
-//	calsCnt := func() func(interface{}) (interface{}, error) {
-//		cnt := 0
-//		return func(_ interface{}) (interface{}, error) {
-//			cnt++
-//			return cnt, nil
-//		}
-//	}()
-//
-//	throttleSettings := stability.ThrottleSettings{
-//		Name: "TestThrottleMax1", MaxTokens: 5, RefillTokensCnt: 1, RefillInterval: time.Duration(1) * time.Second,
-//	}
-//
-//	throttle := stability.NewThrottle(throttleSettings)
-//	throttleEffector := throttle.GetProcessorFn(calsCnt)
-//
-//	var resGot int
-//	var errCnt int
-//	for i := 0; i < 10; i++ {
-//		res, err := throttleEffector(i)
-//		if err == nil {
-//			resGot = res.(int)
-//		} else {
-//			errCnt++
-//		}
-//	}
-//	time.Sleep(time.Duration(3500) * time.Millisecond)
-//
-//	for i := 0; i < 10; i++ {
-//		res, err := throttleEffector(i)
-//		if err == nil {
-//			resGot = res.(int)
-//		} else {
-//			errCnt++
-//		}
-//	}
-//
-//
-//	fmt.Printf("resGot: %d, errCnt: %d\n", resGot, errCnt)
-//
-//	if errCnt != 12 {
-//		t.Errorf("errCnt = %v, want %v", errCnt, 12)
-//	}
-//
-//	if resGot != 8 {
-//		t.Errorf("resGot = %v, want %v", resGot, 8)
-//	}
-//}
+// errHandlerChan channel which has
+// personal errorHandler method
+type errHandlerChan pipeline.BidirectionalStream
+func (e errHandlerChan) getErrorHandlerFn() pipeline.ErrorProcessFn{
+	return func(err error) {
+		e <- err
+	}
+}
+
+// TestCircuitBreakerDataRace tests for data races.
+func TestCircuitBreakerDataRace(t *testing.T) {
+	eh := make(errHandlerChan) // Create error handler
+	defer close(eh)
+	doneCh := make(chan interface{}) // doneChannel (control channel)
+	flipThreshold := 6
+	fanSize := 3
+	failureThreshold := 3
+	breakerSettings := stability.BreakerSettings{ // our circleBreaker settings
+		Name:             "TestCircuitBreakerDataRace",
+		FailureThreshold: uint32(failureThreshold),
+		ExpiryFn: func(tryCnt int) time.Duration {
+			return time.Millisecond * time.Duration(500)
+		},
+	}
+	// function that works under circle breaker
+	processorFn := stability.NewBreaker(breakerSettings).GetProcessorFn(flipFailAfter(flipThreshold))
+	vals := []interface{}{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24}
+	// Create pipeline
+	pl := pipeline.New()
+	// Create funOut stage in pipeline
+	pl.AddStageWithFanOut(pipeline.ProcessFn(processorFn),  eh.getErrorHandlerFn(),uint64(fanSize))
+	// Run pipeline and send output (result) to channel
+	outChan := pl.Run(doneCh, pipeline.Generator(doneCh, vals...))
+
+
+	funcErrCnt := 0
+	breakerErrCnt := 0
+	resCnt := 0
+	for i := 0; i < len(vals); i++ {
+		select {
+		case v := <- outChan:
+			t.Log(fmt.Sprintf("res: %v", v))
+			resCnt++
+		case e := <- eh:
+			t.Log(fmt.Sprintf("err: %v", e))
+			switch e == breakerErr {
+			case true:
+				breakerErrCnt++
+				time.Sleep(time.Second * 1)
+			default:
+				funcErrCnt++
+			}
+		}
+	}
+	//time.Sleep(time.Second * 2)
+	wantRes := 12
+	wantBreakerErr := 4
+	wantFuncErr := 8
+	t.Logf("funcErrCnt: %d", funcErrCnt)
+	t.Logf("breakerErrCnt: %d", breakerErrCnt)
+	t.Logf("resCnt: %d", resCnt)
+	if funcErrCnt != wantFuncErr {
+		t.Errorf("funcErrCnt error. want %d got %d", wantFuncErr, funcErrCnt )
+	}
+	if resCnt != wantRes {
+		t.Errorf("resCnt error. want %d got %d", wantRes, resCnt )
+	}
+	if breakerErrCnt != wantBreakerErr {
+		t.Errorf("breakerErrCnt error. want %d got %d", wantBreakerErr, breakerErrCnt)
+	}
+}
+

@@ -8,7 +8,7 @@ import (
 
 const DefaultFailureThreshold = 1
 
-func defaultExpiryFn(tryCnt int) time.Duration {
+func defaultBreakerExpiryFn(tryCnt int) time.Duration {
 	return time.Millisecond * time.Duration((2<<tryCnt)*10)
 }
 
@@ -28,7 +28,6 @@ type Breaker struct {
 	failureThreshold    uint32
 	consecutiveFailures uint32
 	expiryFn            func(tryCnt int) time.Duration
-	//shouldRetryAt       time.Time
 	lastAttempt         time.Time
 	mutex               sync.Mutex
 }
@@ -43,7 +42,7 @@ func NewBreaker(settings BreakerSettings) *Breaker {
 	}
 
 	if breaker.expiryFn = settings.ExpiryFn; breaker.expiryFn == nil {
-		breaker.expiryFn = defaultExpiryFn
+		breaker.expiryFn = defaultBreakerExpiryFn
 	}
 
 	return breaker
